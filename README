@@ -1,0 +1,95 @@
+Copyright (c) 2013 Michael Mol <mikemol@gmail.com>
+
+(insert BSD 3-clause license here)
+
+msgpass: A message format targeted at secure(ish) asynchronous emails.
+
+PREAMBLE
+
+Email is inherently insecure. Tools such as GPG and S?MIME are nice, but they
+don't secure certain pieces of metadata. Namely, they don't protect the source
+address and the subject. Further, the transport process of email results in
+routing information added to the message, baking additional information
+subject to analysis.
+
+With the existence of malicious nation-states and other entities which perform
+wholesale capture and analysis of network traffic, it becomes critical for
+purposes of individual freedom to maintain the ability to communicate despite
+these entities, and it becomes further critical for these communications to be
+as private as possible.
+
+Finally, with the recent shuttering of privacy-minded hosted email services,
+and with the revelation of fundamental flaws in the privacy and security of
+email, individuals are left with a glaring hole in the suite of standard
+communication habits; while it's easy to use protocols such as TLS and OTR to
+establish secure synchronous communication, there remain no easy and common
+means to have a more critical service: asynchronous communication.
+
+msgpass is intended to help fill this gap.
+
+INTRODUCTION
+
+msgpass tries to tackle the security and privacy aspects in a few basic ways.
+
+1. It uses existing PGP/GPG tools as a means to both protect message
+content and to identify source and destination identities.
+
+2. It does not expose source identity information in the clear; only the
+destination identity is shown.
+
+3. In order to improve on delivery guarantees, it allows for multiple return
+paths to be specified in the encrypted portion of message headers.
+
+4. In order to resist attacks based on known (or guessed, such as is used in
+the CRIME and BEAST attacks against SSL/TLS) cyphertext, nonces are specified
+at the beginning of the message body, and the message version number is kept
+in the clear.
+
+5. In order to ease uptake, the system is explicitly intended to be able to
+work with existing content distribution systems such as pastebins and NNTP
+servers.
+
+MESSAGE FORMAT
+
+The explicit encoding is not yet known. The encoded content, however, is as
+follows:
+
+UNENCRYPTED HEADER:
+
+Magic Number (32 bits):
+	The magic number useful for identifying this file type from others.
+
+Version Number (16 bits):
+	Version of the message format. Currently at version 1.
+
+Recipient GPG Key ID (32 bits):
+	The ID of the public key of the recipient. Everything in the message
+	following this piece of information is encrypted using this key.
+
+ENCRYPTED BODY:
+
+Nonce (64 bits):
+	Unstructured, unpatterned, high-entropy data, used to scramble the
+	state of the encrypting engine. The intent is to prevent two instances
+	of the same message from having identical encrypted forms. If the same
+	message is sent using multiple return paths, the nonce SHOULD be
+	different for each path.
+
+Message ID (128 bits):
+	Value uniquely identifying the message. If the same message is sent
+	using multiple return paths, the Message ID SHOULD be the same for
+	each return path. Comparing Message IDs is the expected mechanism by
+	which a recipient would test for duplicate messages, allowing them to
+	optionally abort retrieving a message in the event they've already
+	received a copy.
+
+Return Paths (variable):
+	In the event of a reply, the message should be deposited to one or
+	more of the listed depositories. An example might be a pastebin, an
+	FTP server or an NNTP newsgroup. This list of possible examples should
+	by no means be considered exhaustive.
+
+Payload:
+	The message content. Its content and form are (at present)
+	unspecified. SMTP messages might plausibly be placed here, or some
+	other format could be designed.
