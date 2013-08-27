@@ -2,9 +2,13 @@ Copyright (c) 2013 Michael Mol <mikemol@gmail.com>
 
 (insert BSD 3-clause license here)
 
+msgpass
+=======
+
 msgpass: A message format targeted at secure(ish) asynchronous emails.
 
-PREAMBLE
+Preamble
+--------
 
 Email is inherently insecure. Tools such as GPG and S?MIME are nice, but they
 don't secure certain pieces of metadata. Namely, they don't protect the source
@@ -27,7 +31,8 @@ means to have a more critical service: asynchronous communication.
 
 msgpass is intended to help fill this gap.
 
-INTRODUCTION
+Introduction
+------------
 
 msgpass tries to tackle the security and privacy aspects in a few basic ways.
 
@@ -49,47 +54,129 @@ in the clear.
 work with existing content distribution systems such as pastebins and NNTP
 servers.
 
-MESSAGE FORMAT
+Message Format
+==============
 
-The explicit encoding is not yet known. The encoded content, however, is as
-follows:
+The explicit encoding is not yet known. The encoded content, however, is described below. The body immediately follows the header.
 
-UNENCRYPTED HEADER:
+Unencrypted Header
+------------------
 
-Magic Number (32 bits):
-	The magic number useful for identifying this file type from others.
+<table>
+  <tr>
+    <th>Field</th><th>Size</th><th>Description</th>
+  </tr>
+  <tr>
+    <td>Magic Number</td>
+    <td>32 bits</td>
+    <td>The magic number useful for identifying this file type from others.</td>
+  </tr>
+  <tr>
+    <td>Version Number</td>
+    <td>16 bits</td>
+    <td>Version of the message format. This spec describes version 1.</td>
+  </tr>
+  <tr>
+    <td>Recipient GPG Key ID</td>
+    <td>32 bits</td>
+    <td>The ID of the public key of the recipient. Everything in the message following this piece of information is encrypted using this key.</td>
+  </tr>
+</table>
 
-Version Number (16 bits):
-	Version of the message format. Currently at version 1.
+Encrypted Body
+--------------
 
-Recipient GPG Key ID (32 bits):
-	The ID of the public key of the recipient. Everything in the message
-	following this piece of information is encrypted using this key.
+<table>
+  <tr>
+    <th>Field</th><th>Size</th><th>Description</th>
+  </tr>
+  <tr>
+    <td>Nonce</td>
+    <td>64 bits</td>
+    <td>High-entropy random data</td>
+  </tr>
+  <tr>
+    <td>Message ID</td>
+    <td>128 bits</td>
+    <td>Unique identifier for message</td>
+  </tr>
+  <tr>
+    <td>Return Paths</td>
+    <td>Variable</td>
+    <td>Depositories for replies to this message</td>
+  </tr>
+</table>
 
-ENCRYPTED BODY:
+Field Descriptions
+-------------------
 
-Nonce (64 bits):
-	Unstructured, unpatterned, high-entropy data, used to scramble the
-	state of the encrypting engine. The intent is to prevent two instances
-	of the same message from having identical encrypted forms. If the same
-	message is sent using multiple return paths, the nonce SHOULD be
-	different for each path.
+__Magic Number__
 
-Message ID (128 bits):
-	Value uniquely identifying the message. If the same message is sent
-	using multiple return paths, the Message ID SHOULD be the same for
-	each return path. Comparing Message IDs is the expected mechanism by
-	which a recipient would test for duplicate messages, allowing them to
-	optionally abort retrieving a message in the event they've already
-	received a copy.
+In order to identify the data on the wire or on disk, a magic number is used.
+This is fairly common practice. The magic number for this data is yet to be
+determined.
 
-Return Paths (variable):
-	In the event of a reply, the message should be deposited to one or
-	more of the listed depositories. An example might be a pastebin, an
-	FTP server or an NNTP newsgroup. This list of possible examples should
-	by no means be considered exhaustive.
+This field is not encrypted.
 
-Payload:
-	The message content. Its content and form are (at present)
-	unspecified. SMTP messages might plausibly be placed here, or some
-	other format could be designed.
+__Version Number__
+
+In order to allow for changes in the format on the wire, a version number is
+necessary. Because the version number defines how to parse the message, it
+must come early in the byte stream. Because the version number is unlikely to
+change often, I don't think it likely to reveal much identifying information.
+Further, because the version number isn't likely to change much, it represents
+a piece ofknown data, and thus, were it included near the beginning of the
+encrypted portion of the stream, would improve the efficacy of
+known-cyphertext attacks against the message body.
+
+In consideration all of these factors, the version number is kept in the
+clear.
+
+This field is not encrypted.
+
+__Recipient GPG Key ID__
+
+The public key ID of the intended recipient. This is the only intended
+mechanism by which the message's destination should be known. Knowledge of the
+recipient's GPG key should inform the sender of the appropriate cyphers to
+use, etc. The message body is encrypted using the public key identified by
+this key ID. Only the message recipient should be able to decode the message.
+
+This field is not encrypted. All subsequent fields are encrypted as a
+monolithic block.
+
+__Nonce__
+
+Random, high-entropy data. This data has no semantic meaning. Its sole purpose
+is to help scramble the state of the cypher engine, and to provide uniqueness
+to multiple copies of the same message sent to a given recipient using varying
+return paths. As such, if a message is placed in multiple depositories, the
+nonce *should* be unique for each placement.
+
+__Message ID__
+
+Value uniquely identifying the message. This value should be able to be
+compared with the same field from another message in order to detect duplicate
+messages without any further decryption of the message body.
+
+If the same message is placed in multiple depositories, they MUST have common
+message IDs, regardless of whether or not they have distinct nonces. There is
+no other defined way to detect identical messages.
+
+__Return Paths__
+
+In the event the recipient wishes to reply, this field lists recommended
+depositories which the sender may check for messages. Examples of depositories
+might include:
+
+* Pastebins
+* Newsgroups
+* File servers
+* Forums
+
+Before this spec is finalized, a proper syntax should be defined.
+
+__Payload__
+
+The message content. May be any arbitrary octet stream.
+
