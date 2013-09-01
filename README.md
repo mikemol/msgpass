@@ -359,3 +359,27 @@ GPG signature of entire encrypted body of message, using the sender's private GP
 
 
 
+Appendix
+========
+
+(This was originally posted to Google+ at:
+https://plus.google.com/108080062547354628132/posts/HnjDEkL6thr  and
+contained the first off-the-cuff version of this spec. It's included here for
+background purposes.)
+
+A very basic, terribly inefficient alternative to email:
+
+1. Compose a message to your intended recipient.
+2. Prefix this message with set of recommended return paths. (A list of pastebins you monitor, for example)
+3. Prefix this message again the source address. (That address being your public key and key ID.)
+4. Encrypt the message with their public key.
+5. Prefix a destination (their public key ID) to the encrypted form of the message.
+6. Post to a pastebin (or more than one) you expect the desired recipient might check.
+
+In this way, the routing data leak is limited. The return path is not leaked. The message source is not revealed in an encrypted form, and the layer 3 source can be obscured using tools like Tor. And if the pastebin you use is wholly within Tor, even better.
+
+It's not perfect, though. There's an obvious need for indexed searches, and servers providing this functionality provide an obvious vulnerability. And anything that lets you follow packets through the Tor network (say, for example, that a powerful hostile entity spins up a network of a million or so Tor nodes, controlling the majority of nodes in the network, and performs realtime analysis on them) also obviously leaks layer 3 identity information.
+
+And, of course, there's no safe way to do aggregate anti-spam analysis without a few thousand honeypot spam targets with spam/ham classification and subscription-based heuristic data distributed on a push basis...but spammers could easily learn to be more selective which keys they target for spamming based on how long the key has been in the system, and avoiding known honeypot keys and key-age ranges with high honeypot densities.
+
+But I haven't seen anyone else come up with or discuss a mechanism for secure online asynchronous message passing to replace email.
