@@ -59,6 +59,28 @@ Message Format
 
 The explicit encoding is not yet known. The encoded content, however, is described below. The body immediately follows the header.
 
+Basic types
+-----------
+
+Several types are reused frequently, such as Blobs and Counts. Blobs are
+themselves compound types, but are used so frequently that I feel they
+warrant up-front explanation.
+
+First, the Count data type. The purpose of this type is, simply, to provide
+a count of values. In the message format, this is often used as a prelude to
+an array of like objects. 
+
+A Count type is always unsigned, and will have the specified number of bits
+where it's referenced elsewhere in the spec.
+
+Next, the Blob type. The Blob type is intended for data packing. It consists
+of a Count value followed by as many octets as are specified by that Count.
+Where the Blob type is referenced, the number of bits for the corresponding
+Count field will also be specified.
+
+Finally, the String type. Strings are Blob types where the content of the
+blob is specified as using UTF-8 as its encoding.
+
 Unencrypted Header
 ------------------
 
@@ -79,9 +101,12 @@ Unencrypted Header
   <tr>
     <td>Recipient GPG Key ID</td>
     <td>32 bits</td>
-    <td>The ID of the public key of the recipient. Everything in the message following this piece of information is encrypted using this key.</td>
+    <td>The ID of the public key of the recipient.</td>
   </tr>
 </table>
+
+Everything following this header is encrypted using the public key associated
+with the Recipient GPG Key ID.
 
 Encrypted Body
 --------------
@@ -101,9 +126,113 @@ Encrypted Body
     <td>Unique identifier for message</td>
   </tr>
   <tr>
+    <td>Sender Public GPG Key</td>
+    <td>Variable. Blob with 16-bit count</td>
+    <td>GPG Public Key of sender. See String type.</td>
+  </tr>
+  <tr>
     <td>Return Paths</td>
-    <td>Variable</td>
+    <td>Variable. Blob with 32-bit count.</td>
     <td>Depositories for replies to this message</td>
+  </tr>
+  <tr>
+    <td>Payload</td>
+    <td>Variable. Blob with 64-bit count.</td>
+    <td>Content of message body</td>
+  </tr>
+  <tr>
+    <td>Signature</td>
+    <td>Variable</td>
+    <td>GPG signature, using sender's key, of entire body of message</td>
+  </tr>
+</table>
+
+Return Paths
+------------
+
+<table>
+  <tr>
+    <th>Field</th><th>Size</th><th>Description</th>
+  </tr>
+  <tr>
+    <td>Count</td>
+    <td>8 bits</td>
+    <td>How many return paths are listed. See Count type.</td>
+  </tr>
+  <tr>
+    <td>Path 1</td>
+    <td>Variable. Blob with 32-bit count.</td>
+    <td>Return Path</td>
+  </tr>
+  <tr>
+    <td>Path 2</td>
+    <td>Variable. Blob with 32-bit count.</td>
+    <td>Return Path</td>
+  </tr>
+  <tr>
+    <td>Path N...</td>
+    <td>Variable. Blob with 32-bit count.</td>
+    <td>Return Path</td>
+  </tr>
+</table>
+
+TODO: Specify return paths more clearly. Include sample path types.
+
+Payload
+_______
+
+<table>
+  <tr>
+    <th>Field</th><th>Size</th><th>Description</th>
+  </tr>
+  <tr>
+    <td>Part count</td>
+    <td>8 bits</td>
+    <td>How many payload parts to look for</td>
+  </tr>
+  <tr>
+    <td>Part 1</td>
+    <td>Variable. Blob with 64-bit count.</td>
+    <td>Payload part.</td>
+  </tr>
+  <tr>
+    <td>Part 2</td>
+    <td>Variable. Blob with 64-bit count.</td>
+    <td>Payload part.</td>
+  </tr>
+  <tr>
+    <td>Part N...</td>
+    <td>Variable. Blob with 64-bit count./td>
+    <td>Further payload parts as necessary</td>
+  </tr>
+</table>
+
+Payload Part
+____________
+
+<table>
+  <tr>
+    <th>Field</th><th>Size</th><th>Description</th>
+  </tr>
+  <tr>
+    <td>Payload Part ID</td>
+    <td>16 bits</td>
+    <td>ID of payload part</td>
+  </tr>
+  <tr>
+    <td>Payload Part Name</td>
+    <td>Variable. String with 16-bit count.</td>
+    <td>Name of Payload</td>
+  <tr>
+  <tr>
+    <td>Payload Part MIME Type</td>
+    <td>Variable. String with 8-bit count.</td>
+    <td>MIME type of payload body</td>
+  </tr>
+  <tr>
+    <td>Payload Part Body</td>
+    <td>Variable. Blob with 64-bit count.</td>
+    <td>Body of the Payload Part</td>
   </tr>
 </table>
 
@@ -163,6 +292,14 @@ If the same message is placed in multiple depositories, they MUST have common
 message IDs, regardless of whether or not they have distinct nonces. There is
 no other defined way to detect identical messages.
 
+__Sender Public GPG Key__
+
+This is the sender's public key. Or, at least, the public key used to sign the
+message. The recipient may, of course, use whatever means they wish to verify
+the key; without out some out-of-band means to verify the key, there's no way
+for the recipient to validate the authenticity of the message short of only
+distributing their own public key to specific parties.
+
 __Return Paths__
 
 In the event the recipient wishes to reply, this field lists recommended
@@ -174,9 +311,51 @@ might include:
 * File servers
 * Forums
 
+A return path might also indicate a different public key which should be used
+encrypt messages sent via that path. As a consequence, it might also function
+as a CC/BCC target list for replies, resulting in a default of a "reply-to-
+all" semantic. It might also serve as a mechanism by which the original
+sender may seek to encode further information which might trigger decisions
+upon receipt of reply.
+
 Before this spec is finalized, a proper syntax should be defined.
 
 __Payload__
 
-The message content. May be any arbitrary octet stream.
+The message content. Consists of multiple Payload Parts.
+
+__Payload Part__
+
+Each Payload Part consists of an ID, a Payload Part Name, a MIME type for the
+Payload Part Body, and the Payload Part Body itself, which contains the actual
+data.
+
+__Payload Part ID__
+
+Identifies the Payload Part, so that other Payload Parts which may wish to
+transclude it may do so. An example of this principle is seen in HTML emails
+with inline-attached images.
+
+Payload Parts with the same ID, but different MIME types, should be considered
+different means of representing the same content. In this way, plaintext, HTML
+and audio forms of the same message might be simultaneously offered.
+
+__Payload Part Name__
+
+A human-readable description of the Payload Part. If Payload Parts are broken
+out into separate files, this would be considered the part's filename.
+
+__Payload Part MIME Type__
+
+A hint as to how the content of the Payload Part Body should be used.
+
+__Payload Part Body__
+
+The raw meat of a Payload Part.
+
+__Signature__
+
+GPG signature of entire encrypted body of message, using the sender's private GPG key.
+
+
 
