@@ -57,8 +57,15 @@ servers.
 Message Format
 ==============
 
-All fields are packed on 8-bit boundaries, with no padding. Except where noted,
-all fields are in network byte order. The body immediately follows the header.
+All fields are packed on 8-bit boundaries, with no padding.
+
+Except where noted, all fields are in network byte order.
+
+The body immediately follows the header.
+
+There are multiple version numbers in the envelope, each corresponding to a
+depth; in version 1, the Outer version number applies to the header, while
+the Inner version number apples to the message body.
 
 Basic types
 -----------
@@ -95,9 +102,9 @@ Unencrypted Header
     <td>The magic number useful for identifying this file type from others.</td>
   </tr>
   <tr>
-    <td>Version Number</td>
+    <td>Version Number (Outer)</td>
     <td>16 bits</td>
-    <td>Version of the message format. This spec describes version 1.</td>
+    <td>Version of the message outer format. This spec describes version 1.</td>
   </tr>
   <tr>
     <td>Recipient GPG Key ID</td>
@@ -125,6 +132,11 @@ Encrypted Body
     <td>Message ID</td>
     <td>128 bits</td>
     <td>Unique identifier for message</td>
+  </tr>
+  <tr>
+    <td>Version Number (Inner)</td>
+    <td>32 bits</td>
+    <td>Version of the message inner format. This spec describes version 1.</td>
   </tr>
   <tr>
     <td>Sender Public GPG Key</td>
@@ -248,19 +260,23 @@ determined.
 
 This field is not encrypted.
 
-__Version Number__
+__Version Number (Outer)__
 
 In order to allow for changes in the format on the wire, a version number is
 necessary. Because the version number defines how to parse the message, it
 must come early in the byte stream. Because the version number is unlikely to
 change often, I don't think it likely to reveal much identifying information.
 Further, because the version number isn't likely to change much, it represents
-a piece ofknown data, and thus, were it included near the beginning of the
+a piece of known data, and thus, were it included near the beginning of the
 encrypted portion of the stream, would improve the efficacy of
 known-cyphertext attacks against the message body.
 
 In consideration all of these factors, the version number is kept in the
 clear.
+
+However, becaue it is neither encrypted nor signed, it can be spoofed. Since
+this may in the future be used to confuse a message parser, this version number
+only describes the layout of the outer, unencrypted portion of the envelope.
 
 This field is not encrypted.
 
@@ -292,6 +308,10 @@ messages without any further decryption of the message body.
 If the same message is placed in multiple depositories, they MUST have common
 message IDs, regardless of whether or not they have distinct nonces. There is
 no other defined way to detect identical messages.
+
+__Version Number (Inner)__
+
+Identifies the format of the message body.
 
 __Sender Public GPG Key__
 
