@@ -57,7 +57,8 @@ servers.
 Message Format
 ==============
 
-The explicit encoding is not yet known. The encoded content, however, is described below. The body immediately follows the header.
+All fields are packed on 8-bit boundaries, with no padding. Except where noted,
+all fields are in network byte order. The body immediately follows the header.
 
 Basic types
 -----------
